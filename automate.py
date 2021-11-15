@@ -1,43 +1,73 @@
-import argparse
-
-import pandas as pd
 import requests
 import json
+import inquirer
+import time
+import re
 
-parser = argparse.ArgumentParser(description="Pass in the URL and field IDs")
+questions = [
+    inquirer.List(
+        'module',
+        message="What are you booking in",
+        choices=[
+            'MTPR',
+            'KBLC',
+            'KBLC2',
+            'KSLC',
+        ],
+    ),
+    inquirer.List(
+        'location',
+        message="Choose location",
+        choices=[
+            'BKK',
+            'UPC',
+        ],
+    ),
+    inquirer.Text('repeat',
+                  message="Repeat times",
+                  validate=lambda _, x: re.match('\d', x) and len(x) < 5),
+    inquirer.Text('interval',
+                  message="Repeat interval (second)",
+                  validate=lambda _, x: re.match('\d', x) and len(x) < 5),
+]
+answers = inquirer.prompt(questions)
 
-parser.add_argument('csv_fp', type=str, help="Pass the file path of the csv file")
+with open('./data.json') as json_file:
+    data = json.load(json_file)
 
-args = parser.parse_args()
+moduleData = data[answers['module']]
+locationList = ['BKK (กทม. และปริมณฑล)', 'UPC (ต่างจังหวัด)']
+carNo = '2ฒข783'
+company = 'พงศ์ธาริน'
+driverName = 'มณฑล ธีระราษฎร์'
+driverPhone = '0929046313'
+location = locationList[0] if answers['location'] == 'BKK' else locationList[1]
 
-# csv_fp = "./automate.csv"
-csv_df = pd.read_csv(args.csv_fp)
-
-with open('./ids.json') as json_file:
-    form_field = json.load(json_file)
-
-# form_id = form_field['form_id']
-name_id = form_field['name_id']
-email_id = form_field['email_id']
-add_id = form_field['add_id']
-url = form_field['url']
 
 def submit(url, submission):
     response = requests.post(url, submission)
-    response_code = response.status_code
-    print(response_code)
+    return response.status_code
 
-for index, row in csv_df.iterrows():
-    # print(row)
-    name = row['Name']
-    email = row['Email']
-    address = row['Address']
 
-    submission = {name_id: name,
-                  email_id: email,
-                  add_id: address}
+submission = {
+    moduleData['carNo']: carNo,
+    moduleData['location']: location,
+    moduleData['company']: company,
+    moduleData['driverName']: driverName,
+    moduleData['driverPhone']: driverPhone
+}
 
-    submit(url, submission)
+repeatTime = int(answers['repeat'])
 
-    print(index, 'request sent')
+for current in range(repeatTime):
+    resCode = submit(moduleData['url'], submission)
+    if resCode == 200:
+        print('Summit form success')
+        print('End process with success')
+        break
 
+    balance = repeatTime - (current + 1)
+    print(f'Summit form not success. will be try {balance} times')
+    time.sleep(int(answers['interval']))
+    if not balance:
+        print('End process with not success. Please try later')
