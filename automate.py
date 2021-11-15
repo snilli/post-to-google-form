@@ -3,12 +3,16 @@ import json
 import inquirer
 import time
 import re
+import pprint
+import datetime
+import csv
 
 questions = [
     inquirer.List(
         'module',
         message="What are you booking in",
         choices=[
+            'MEE',
             'MTPR',
             'KBLC',
             'KBLC2',
@@ -32,42 +36,79 @@ questions = [
 ]
 answers = inquirer.prompt(questions)
 
-with open('./data.json') as json_file:
-    data = json.load(json_file)
+with open('./setting.json') as setting_raw:
+    setting = json.load(setting_raw)
 
-moduleData = data[answers['module']]
+with open('./data.json') as entry_point_raw:
+    entry_point = json.load(entry_point_raw)
+
+printer = pprint.PrettyPrinter(indent=4, compact=True, width=40)
+
+printer.pprint('============= profile =============')
+printer.pprint(setting)
+printer.pprint('=========== summit data ===========')
+printer.pprint(answers)
+printer.pprint('===================================')
+
+moduleData = entry_point[answers['module']]
 locationList = ['BKK (กทม. และปริมณฑล)', 'UPC (ต่างจังหวัด)']
-carNo = '2ฒข783'
-company = 'พงศ์ธาริน'
-driverName = 'มณฑล ธีระราษฎร์'
-driverPhone = '0929046313'
+
 location = locationList[0] if answers['location'] == 'BKK' else locationList[1]
 
 
 def submit(url, submission):
-    response = requests.post(url, submission)
-    return response.status_code
+    response = requests.post(f'{url}/formResponse', submission)
+    return [response.status_code, response.text]
+
+
+def formveiw(url):
+    response = requests.get(f'{url}/viewform')
+    return response.text
+
+
+def is_close_form(text):
+    return text.find(
+        'freebirdFormviewerViewResponseConfirmContentContainer') != -1
+
+
+def write_log(status, reason):
+    log = open("log.csv", "a")
+    writer = csv.writer(log)
+    writer.writerow([datetime.datetime.now(), submission, status, reason])
 
 
 submission = {
-    moduleData['carNo']: carNo,
+    moduleData['carNo']: setting['carNo'],
     moduleData['location']: location,
-    moduleData['company']: company,
-    moduleData['driverName']: driverName,
-    moduleData['driverPhone']: driverPhone
+    moduleData['company']: setting['company'],
+    moduleData['driverName']: setting['driverName'],
+    moduleData['driverPhone']: setting['driverPhone']
 }
 
 repeatTime = int(answers['repeat'])
 
 for current in range(repeatTime):
-    resCode = submit(moduleData['url'], submission)
-    if resCode == 200:
-        print('Summit form success')
-        print('End process with success')
+    text = formveiw(moduleData['url'])
+    is_close_time = is_close_form(text)
+    if is_close_time:
+        balance = repeatTime - (current + 1)
+        print(f'From still close. will be try {balance} times')
+        time.sleep(int(answers['interval']))
+
+        if not balance:
+            print('End process with not success. Please try later')
+            write_log('fail', 'form close')
+            break
+
+        continue
+
+    resCode, data = submit(moduleData['url'], submission)
+    if resCode != 200:
+        write_log('fail', 'form error')
+        print('Already submit. Please try later')
         break
 
-    balance = repeatTime - (current + 1)
-    print(f'Summit form not success. will be try {balance} times')
-    time.sleep(int(answers['interval']))
-    if not balance:
-        print('End process with not success. Please try later')
+    write_log('success', 'submitted')
+    print('Summit form success')
+    print('End process with success')
+    break
