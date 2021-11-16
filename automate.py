@@ -12,7 +12,6 @@ questions = [
         'module',
         message="What are you booking in",
         choices=[
-            'MEE',
             'MTPR',
             'KBLC',
             'KBLC2',
