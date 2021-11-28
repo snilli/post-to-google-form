@@ -17,6 +17,8 @@ questions = [
             'KBLC',
             'KBLC2',
             'KSLC',
+            'KSLC2',
+            'KMLC'
         ],
     ),
     inquirer.List(
@@ -72,7 +74,7 @@ def is_close_form(text):
 
 
 def write_log(status, reason):
-    log = open("log.csv", "a")
+    log = open("log.csv", "a", encoding='utf-8')
     writer = csv.writer(log)
     writer.writerow([datetime.datetime.now(), submission, status, reason])
 
@@ -82,7 +84,8 @@ submission = {
     moduleData['location']: location,
     moduleData['company']: setting['company'],
     moduleData['driverName']: setting['driverName'],
-    moduleData['driverPhone']: setting['driverPhone']
+    moduleData['driverPhone']: setting['driverPhone'],
+    "pageHistory": moduleData['pageHistory']
 }
 
 repeatTime = int(answers['repeat'])
